@@ -348,7 +348,7 @@ function inv(r){
   return '<div class="bar"></div>'+
   '<div class="ih"><img src="'+LOGO+'"><div class="co"><b>'+esc(CO.name)+'</b><span class="tg">Designed to Inspire</span>'+
   ((CO.gstin||CO.pan)?'<div class="id">'+(CO.gstin?'<span><i>GSTIN</i>'+esc(CO.gstin)+'</span>':'')+(CO.pan?'<span><i>PAN</i>'+esc(CO.pan)+'</span>':'')+'</div>':'')+'</div></div>'+
-  '<div class="ad"><div class="a1"><small>Address</small>'+esc(CO.addr)+'</div><div class="a2"><small>Contact</small>Ph: '+esc(CO.ph)+'<br>'+esc(CO.em)+'<br>'+esc(CO.web)+'</div></div>'+
+  //'<div class="ad"><div class="a1"><small>Address</small>'+esc(CO.addr)+'</div><div class="a2"><small>Contact</small>Ph: '+esc(CO.ph)+'<br>'+esc(CO.em)+'<br>'+esc(CO.web)+'</div></div>'+
   '<div class="tl"><h3>TAX INVOICE</h3><div>Invoice No: <b>'+esc(r.InvoiceNo)+'</b><br>Date: <b>'+esc(fd(r.Date))+'</b></div></div>'+
   '<div class="bd"><div class="pj"><div><small>Project</small><b>'+esc(r.Project)+'</b></div><div><small>Service Type</small><b>'+esc(r.Type)+'</b></div></div>'+
   '<div class="pt'+(hasShip?'':' one')+'"><div><small>Buyer (Bill to)</small>'+party(r.Client,r.ClientGSTIN,r.ClientPAN,r.ClientAddress)+'</div>'+(hasShip?'<div><small>Consignee (Ship to)</small>'+party(r.ShipName,r.ShipGSTIN,r.ShipPAN,r.ShipAddress)+'</div>':'')+'</div>'+
