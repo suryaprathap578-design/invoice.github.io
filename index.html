@@ -86,6 +86,7 @@ table.l tr:hover td{background:#faf6e9}
 .inv small{display:block;font-size:8px;letter-spacing:.22em;color:#9a7b1f;text-transform:uppercase;font-weight:600}
 .inv .pj b{color:#0A1F44;font-size:11px}
 .inv .pt{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.inv .pt.one{grid-template-columns:1fr}
 .inv .pt>div{border:1px solid #d5dbe8;border-top:3px solid #0A1F44;padding:9px 12px;min-height:88px}
 .inv .pt strong{display:block;color:#0A1F44;font-size:12px;margin:2px 0}
 .inv .pt p{color:#3d465a}.inv .pt p b{color:#0A1F44}
@@ -155,8 +156,8 @@ table.l tr:hover td{background:#faf6e9}
     <div class="w2"><label>Address *</label><input id="ca" required placeholder="Full billing address"></div>
    </div>
 
-   <h4><span>Shipping details (Ship to)</span><label class="chk"><input type="checkbox" id="same" checked> Same as client details</label></h4>
-   <div class="g hide" id="shipbox">
+   <h4><span>Shipping details (Ship to) – optional</span><label class="chk">Leave blank to hide it on the invoice</label></h4>
+   <div class="g" id="shipbox">
     <div><label>Name</label><input id="sn" placeholder="Consignee name"></div>
     <div><label>GSTIN <em>(optional)</em></label><input id="sg" class="up" maxlength="15" pattern="[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][0-9A-Za-z]Z[0-9A-Za-z]" title="15-character GSTIN"></div>
     <div><label>PAN <em>(optional)</em></label><input id="sp" class="up" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="10-character PAN"></div>
@@ -170,11 +171,11 @@ table.l tr:hover td{background:#faf6e9}
 
    <h4><span>Taxes &amp; terms</span></h4>
    <div class="g">
-    <div><label>GST</label><select id="tx"><option value="none">No GST</option><option value="split" selected>CGST 9% + SGST 9%</option><option value="igst">GST 18% (IGST)</option></select></div>
+    <div><label>CGST</label><select id="cgr"><option value="0">None</option><option value="2.5">2.5%</option><option value="6">6%</option><option value="9" selected>9%</option><option value="14">14%</option></select></div><div><label>SGST</label><select id="sgr"><option value="0">None</option><option value="2.5">2.5%</option><option value="6">6%</option><option value="9" selected>9%</option><option value="14">14%</option></select></div><div><label>GST / IGST</label><select id="igr"><option value="0" selected>None</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option><option value="28">28%</option></select></div>
     <div class="w2"><label>Terms &amp; Conditions <em>(optional – one per line; shown on the invoice only when filled)</em></label><textarea id="tc" placeholder="e.g. Payment due within 15 days of invoice date."></textarea></div>
    </div>
 
-   <div class="sum"><div><span>Taxable Value</span><span id="s1"></span></div><div id="r1" class="hide"><span>CGST 9%</span><span id="s2"></span></div><div id="r2" class="hide"><span>SGST 9%</span><span id="s4"></span></div><div id="r3" class="hide"><span>IGST 18%</span><span id="s5"></span></div><div class="t"><span>Grand Total</span><span id="s3"></span></div></div>
+   <div class="sum"><div><span>Taxable Value</span><span id="s1"></span></div><div id="r1" class="hide"><span id="l1">CGST</span><span id="s2"></span></div><div id="r2" class="hide"><span id="l2">SGST</span><span id="s4"></span></div><div id="r3" class="hide"><span id="l3">IGST</span><span id="s5"></span></div><div class="t"><span>Grand Total</span><span id="s3"></span></div></div>
    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap"><button class="btn" id="sv">Save &amp; Generate Invoice</button><button type="button" class="btn o hide" id="cx">Cancel edit</button></div>
   </form>
   <div id="pv" class="hide">
@@ -199,7 +200,7 @@ table.l tr:hover td{background:#faf6e9}
 /* ===================== CONFIGURATION ===================== */
 const CONFIG={
   // 👉 Google Apps Script Web App URL (ends with /exec). Leave '' for Demo Mode (browser-only data).
-  SCRIPT_URL:'https://script.google.com/macros/s/AKfycbxs8qOY0rTFR44srOmFsaDdmfuS41aSS1RobWplUIwWUs6tBibLsV1FouqVPf5t4Hr6aw/exec',
+  SCRIPT_URL:'https://script.google.com/macros/s/AKfycbz6mm_HfWXO4aZKLlQTRw3bzDR0mJAo3o27DUvK1UvTvvJ20qMlGiV0zmV0ihNpqqGNbg/exec',
   USER:'subhaInfra', PASS:'welcomeP88!'
 };
 /* 👉 COMPANY DETAILS shown on every invoice – fill in gstin / pan (and confirm website) */
@@ -259,33 +260,34 @@ function row(r={}){
   e.oninput=calc;$('items').appendChild(e);calc();
 }
 const items=()=>[...$('items').children].map(e=>{const qty=+e.querySelector('.qy').value||0,rate=+e.querySelector('.rt').value||0;return{desc:e.querySelector('.ds').value.trim(),hsn:e.querySelector('.hs').value.trim(),unit:e.querySelector('.un').value,qty,rate,amount:rnd(qty*rate)}});
-function tax(sub,mode){let c=0,s=0,i=0;if(mode==='split'){c=rnd(sub*.09);s=rnd(sub*.09)}else if(mode==='igst')i=rnd(sub*.18);return{c,s,i,t:rnd(c+s+i)}}
+const rates=()=>({c:+$('cgr').value||0,s:+$('sgr').value||0,i:+$('igr').value||0});
+function tax(sub,R){const c=rnd(sub*R.c/100),s=rnd(sub*R.s/100),i=rnd(sub*R.i/100);return{c,s,i,t:rnd(c+s+i)}}
 function calc(){
   const it=items();[...$('items').children].forEach((e,k)=>e.querySelector('.a').textContent=inr(it[k].amount));
-  const sub=rnd(it.reduce((t,x)=>t+x.amount,0)),m=$('tx').value,x=tax(sub,m);
-  $('s1').textContent='₹ '+inr(sub);$('r1').classList.toggle('hide',m!=='split');$('r2').classList.toggle('hide',m!=='split');$('r3').classList.toggle('hide',m!=='igst');
+  const sub=rnd(it.reduce((t,x)=>t+x.amount,0)),R=rates(),x=tax(sub,R);
+  $('s1').textContent='₹ '+inr(sub);
+  $('r1').classList.toggle('hide',!R.c);$('r2').classList.toggle('hide',!R.s);$('r3').classList.toggle('hide',!R.i);
+  $('l1').textContent='CGST '+R.c+'%';$('l2').textContent='SGST '+R.s+'%';$('l3').textContent='IGST '+R.i+'%';
   $('s2').textContent='₹ '+inr(x.c);$('s4').textContent='₹ '+inr(x.s);$('s5').textContent='₹ '+inr(x.i);$('s3').textContent='₹ '+inr(sub+x.t);
 }
-$('add').onclick=()=>row();$('tx').onchange=calc;
-$('same').onchange=()=>$('shipbox').classList.toggle('hide',$('same').checked);
-function reset(){$('f').reset();$('items').innerHTML='';row();$('dt').value=today();$('in').value=nextNo();editing=null;$('same').checked=true;$('shipbox').classList.add('hide');$('ft').textContent='Create Tax Invoice';$('cx').classList.add('hide');$('pv').classList.add('hide');calc()}
+$('add').onclick=()=>row();['cgr','sgr','igr'].forEach(k=>$(k).onchange=calc);
+function reset(){$('f').reset();$('items').innerHTML='';row();$('dt').value=today();$('in').value=nextNo();editing=null;$('ft').textContent='Create Tax Invoice';$('cx').classList.add('hide');$('pv').classList.add('hide');calc()}
 $('cx').onclick=()=>{reset();show(2)};
 function edit(no){
   const r=DB.find(x=>x.InvoiceNo===no);if(!r)return;reset();editing=no;
   $('in').value=r.InvoiceNo;$('dt').value=String(r.Date).slice(0,10);$('pn').value=r.Project;$('pt').value=r.Type;
   $('cn').value=r.Client;$('cg').value=r.ClientGSTIN||'';$('cp').value=r.ClientPAN||'';$('ca').value=r.ClientAddress;
-  const same=(r.ShipName||'')===r.Client&&(r.ShipGSTIN||'')===(r.ClientGSTIN||'')&&(r.ShipPAN||'')===(r.ClientPAN||'')&&(r.ShipAddress||'')===r.ClientAddress;
-  $('same').checked=same;$('shipbox').classList.toggle('hide',same);
-  if(!same){$('sn').value=r.ShipName||'';$('sg').value=r.ShipGSTIN||'';$('sp').value=r.ShipPAN||'';$('sa').value=r.ShipAddress||''}
-  $('tx').value=r.TaxMode||'none';$('tc').value=r.Terms||'';
+  $('sn').value=r.ShipName||'';$('sg').value=r.ShipGSTIN||'';$('sp').value=r.ShipPAN||'';$('sa').value=r.ShipAddress||'';
+  $('cgr').value=String(r.CGSTRate??0);$('sgr').value=String(r.SGSTRate??0);$('igr').value=String(r.IGSTRate??0);$('tc').value=r.Terms||'';
   $('items').innerHTML='';(r.Items&&r.Items.length?r.Items:[{}]).forEach(row);calc();
   $('ft').textContent='Edit Invoice '+no;$('cx').classList.remove('hide');$('pv').classList.add('hide');show(1);
 }
 $('f').onsubmit=async e=>{
-  e.preventDefault();const it=items(),sub=rnd(it.reduce((t,x)=>t+x.amount,0)),m=$('tx').value,x=tax(sub,m),same=$('same').checked;
+  e.preventDefault();const it=items(),sub=rnd(it.reduce((t,x)=>t+x.amount,0)),R=rates(),x=tax(sub,R);
+  if(R.i&&(R.c||R.s)){toast('Choose either CGST + SGST (same state) or IGST (other state) – not both');return}
   const rec={InvoiceNo:$('in').value,Date:$('dt').value,Client:$('cn').value.trim(),ClientGSTIN:$('cg').value.toUpperCase(),ClientPAN:$('cp').value.toUpperCase(),ClientAddress:$('ca').value.trim(),
-    ShipName:same?$('cn').value.trim():$('sn').value.trim(),ShipGSTIN:same?$('cg').value.toUpperCase():$('sg').value.toUpperCase(),ShipPAN:same?$('cp').value.toUpperCase():$('sp').value.toUpperCase(),ShipAddress:same?$('ca').value.trim():$('sa').value.trim(),
-    Project:$('pn').value.trim(),Type:$('pt').value,Items:it,TaxMode:m,TaxRate:m==='none'?0:18,Subtotal:sub,CGST:x.c,SGST:x.s,IGST:x.i,Total:rnd(sub+x.t),Terms:$('tc').value.trim()};
+    ShipName:$('sn').value.trim(),ShipGSTIN:$('sg').value.toUpperCase(),ShipPAN:$('sp').value.toUpperCase(),ShipAddress:$('sa').value.trim(),
+    Project:$('pn').value.trim(),Type:$('pt').value,Items:it,CGSTRate:R.c,SGSTRate:R.s,IGSTRate:R.i,Subtotal:sub,CGST:x.c,SGST:x.s,IGST:x.i,Total:rnd(sub+x.t),Terms:$('tc').value.trim()};
   rec.AmountInWords=words(rec.Total);
   const b=$('sv');b.textContent='Saving…';b.disabled=true;
   try{
@@ -321,17 +323,18 @@ const two=n=>n<20?O[n]:T[n/10|0]+(n%10?' '+O[n%10]:'');
 const three=n=>(n>99?O[n/100|0]+' Hundred'+(n%100?' ':''):'')+(n%100?two(n%100):'');
 function words(v){v=Math.round(v*100);let r=Math.floor(v/100),p=v%100,s='';[[1e7,'Crore'],[1e5,'Lakh'],[1e3,'Thousand']].forEach(([d,l])=>{if(r>=d){s+=three(Math.floor(r/d))+' '+l+' ';r%=d}});s+=three(r);return 'Rupees '+(s.trim()||'Zero')+(p?' and '+two(p)+' Paise':'')+' Only'}
 const fd=d=>{const s=String(d).slice(0,10),m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?m[3]+'/'+m[2]+'/'+m[1]:String(d)};
-const party=(n,g,p,a)=>'<strong>'+esc(n)+'</strong><p>'+esc(a)+'</p><p>'+(g?'GSTIN: <b>'+esc(g)+'</b>':'')+(g&&p?' &nbsp;|&nbsp; ':'')+(p?'PAN: <b>'+esc(p)+'</b>':'')+'</p>';
+const party=(n,g,p,a)=>(n?'<strong>'+esc(n)+'</strong>':'')+(a?'<p>'+esc(a)+'</p>':'')+'<p>'+(g?'GSTIN: <b>'+esc(g)+'</b>':'')+(g&&p?' &nbsp;|&nbsp; ':'')+(p?'PAN: <b>'+esc(p)+'</b>':'')+'</p>';
 function inv(r){
   const tr=(l,v)=>'<div><span>'+l+'</span><span>'+inr(v)+'</span></div>';
-  const taxRows=r.TaxMode==='split'?tr('CGST @ 9%',r.CGST)+tr('SGST @ 9%',r.SGST):r.TaxMode==='igst'?tr('IGST @ 18%',r.IGST):'';
+  const taxRows=(r.CGSTRate>0?tr('CGST @ '+r.CGSTRate+'%',r.CGST):'')+(r.SGSTRate>0?tr('SGST @ '+r.SGSTRate+'%',r.SGST):'')+(r.IGSTRate>0?tr('IGST @ '+r.IGSTRate+'%',r.IGST):'');
+  const hasShip=!!(r.ShipName||r.ShipAddress||r.ShipGSTIN||r.ShipPAN);
   const terms=String(r.Terms||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   return '<div class="bar"></div>'+
   '<div class="ih"><img src="'+LOGO+'"><div class="co"><b>'+esc(CO.name)+'</b><div>'+esc(CO.addr)+'</div><div>Ph: '+esc(CO.ph)+' &nbsp;|&nbsp; '+esc(CO.em)+'</div><div>'+esc(CO.web)+'</div>'+
   ((CO.gstin||CO.pan)?'<div class="id">'+(CO.gstin?'<i>GSTIN</i>'+esc(CO.gstin):'')+(CO.gstin&&CO.pan?' &nbsp;&nbsp; ':'')+(CO.pan?'<i>PAN</i>'+esc(CO.pan):'')+'</div>':'')+'</div></div>'+
   '<div class="tl"><h3>TAX INVOICE</h3><div>Invoice No: <b>'+esc(r.InvoiceNo)+'</b><br>Date: <b>'+esc(fd(r.Date))+'</b></div></div>'+
   '<div class="bd"><div class="pj"><div><small>Project</small><b>'+esc(r.Project)+'</b></div><div><small>Service Type</small><b>'+esc(r.Type)+'</b></div></div>'+
-  '<div class="pt"><div><small>Buyer (Bill to)</small>'+party(r.Client,r.ClientGSTIN,r.ClientPAN,r.ClientAddress)+'</div><div><small>Consignee (Ship to)</small>'+party(r.ShipName||r.Client,r.ShipGSTIN,r.ShipPAN,r.ShipAddress||r.ClientAddress)+'</div></div>'+
+  '<div class="pt'+(hasShip?'':' one')+'"><div><small>Buyer (Bill to)</small>'+party(r.Client,r.ClientGSTIN,r.ClientPAN,r.ClientAddress)+'</div>'+(hasShip?'<div><small>Consignee (Ship to)</small>'+party(r.ShipName,r.ShipGSTIN,r.ShipPAN,r.ShipAddress)+'</div>':'')+'</div>'+
   '<table><thead><tr><th style="width:30px">Sl.</th><th>Description</th><th style="width:62px">HSN/SAC</th><th style="width:40px">Units</th><th class="r" style="width:62px">Qty</th><th class="r" style="width:80px">Rate (₹)</th><th class="r" style="width:92px">Amount (₹)</th></tr></thead><tbody>'+
   r.Items.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(x.desc)+'</td><td>'+esc(x.hsn||'–')+'</td><td>'+esc(x.unit)+'</td><td class="r">'+inr(x.qty)+'</td><td class="r">'+inr(x.rate)+'</td><td class="r"><b>'+inr(x.amount)+'</b></td></tr>').join('')+'</tbody></table>'+
   '<div class="sm"><div class="l"><div class="wd">'+esc(r.AmountInWords||words(r.Total))+'</div>'+
