@@ -5,7 +5,8 @@
 <title>Subha Infra – Invoice Portal</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--navy:#0A1F44;--gold:#C9A646;--mute:#6b7488;--line:#e3e7ef}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -69,7 +70,7 @@ table.l tr:hover td{background:#faf6e9}
 .sc{overflow-x:auto;background:#e8ecf4;padding:10px}
 
 /* ===== A4 INVOICE (794 x 1123 px) ===== */
-.inv{width:794px;min-height:1120px;margin:0 auto;background:#fff;display:flex;flex-direction:column;font-family:'Inter',Arial,sans-serif;font-size:10.5px;line-height:1.5;color:#1d2433;position:relative}
+.inv{width:794px;min-height:1118px;margin:0 auto;background:#fff;display:flex;flex-direction:column;font-family:'Inter',Arial,sans-serif;font-size:10.5px;line-height:1.5;color:#1d2433;position:relative}
 .inv .bar{height:9px;background:linear-gradient(90deg,#0A1F44 0 74%,#C9A646 74% 100%)}
 .inv .ih{display:flex;justify-content:space-between;align-items:center;padding:16px 36px 14px;gap:20px}
 .inv .ih img{height:76px}
@@ -116,6 +117,17 @@ table.l tr:hover td{background:#faf6e9}
 .inv .sg div{text-align:center;min-width:200px;font-size:10px}.inv .sg i{display:block;height:44px}.inv .sg b{display:block;border-top:1px solid #0A1F44;padding-top:5px;color:#0A1F44}
 .inv .ft{margin-top:auto;background:#0A1F44;color:#cbd4e6;text-align:center;padding:12px 36px 13px;border-top:3px solid #C9A646;font-size:9px;line-height:1.7}
 .inv .ft b{display:block;font-family:'Playfair Display',serif;color:#C9A646;font-size:14px;letter-spacing:.16em;margin-bottom:2px}
+#printhost{display:none}
+.acts{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.inv thead{display:table-header-group}
+@page{size:A4;margin:0}
+@media print{
+ html,body{background:#fff!important;margin:0!important;padding:0!important;min-height:0!important}
+ body>*:not(#printhost){display:none!important}
+ #printhost{display:block!important}
+ #printhost .inv{width:210mm;margin:0;box-shadow:none}
+ .inv,.inv *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 @media(max-width:860px){.row{grid-template-columns:1fr 1fr 1fr}.row .ds{grid-column:1/-1}.hd.h{display:none}.panel{padding:20px}}
 </style>
 </head>
@@ -183,7 +195,7 @@ table.l tr:hover td{background:#faf6e9}
    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap"><button class="btn" id="sv">Save &amp; Generate Invoice</button><button type="button" class="btn o hide" id="cx">Cancel edit</button></div>
   </form>
   <div id="pv" class="hide">
-   <div style="margin-bottom:14px"><button class="btn" id="dl">Download PDF</button></div>
+   <div class="acts" data-src="inv"><button type="button" class="btn" data-act="pdf">Download PDF</button><button type="button" class="btn o" data-act="folder">Save to folder…</button><button type="button" class="btn o" data-act="print">Print / Save as PDF</button></div>
    <div class="sc"><div id="inv" class="inv"></div></div>
   </div>
  </div>
@@ -194,11 +206,12 @@ table.l tr:hover td{background:#faf6e9}
    <div class="tb"><input id="q" placeholder="Search client, project, invoice no…"><div style="display:flex;gap:8px"><button class="btn s" id="ad">+ Add New</button><button class="btn s o" id="rf">Refresh</button></div></div>
    <div class="tw"><table class="l"><thead><tr><th>Invoice No</th><th>Date</th><th>Client</th><th>Project</th><th>Total (₹)</th><th>Actions</th></tr></thead><tbody id="tb"></tbody></table></div>
   </div>
-  <div id="pv2" class="hide"><div style="margin-bottom:14px"><button class="btn" id="dl2">Download PDF</button></div><div class="sc"><div id="inv2" class="inv"></div></div></div>
+  <div id="pv2" class="hide"><div class="acts" data-src="inv2"><button type="button" class="btn" data-act="pdf">Download PDF</button><button type="button" class="btn o" data-act="folder">Save to folder…</button><button type="button" class="btn o" data-act="print">Print / Save as PDF</button></div><div class="sc"><div id="inv2" class="inv"></div></div></div>
  </div>
  </main>
 </div>
 <div id="toast"></div>
+<div id="printhost"></div>
 
 <script>
 /* ===================== CONFIGURATION ===================== */
@@ -300,7 +313,7 @@ $('f').onsubmit=async e=>{
     if(r.invoiceNo)rec.InvoiceNo=r.invoiceNo;
     toast('✔ Saved – Invoice '+rec.InvoiceNo);
     $('in').value=rec.InvoiceNo;editing=rec.InvoiceNo;$('ft').textContent='Edit Invoice '+editing;$('cx').classList.remove('hide');
-    $('inv').innerHTML=inv(rec);$('pv').classList.remove('hide');
+    $('inv').innerHTML=inv(rec);$('inv').dataset.no=rec.InvoiceNo;$('pv').classList.remove('hide');
     await load();setTimeout(()=>$('pv').scrollIntoView({behavior:'smooth'}),80);
   }catch(x){toast('Error: '+x.message)}
   b.textContent='Save & Generate Invoice';b.disabled=false;
@@ -315,11 +328,10 @@ function draw(){
 $('q').oninput=draw;
 $('tb').onclick=async e=>{
   const t=e.target,v=t.dataset.v,ed=t.dataset.e,d=t.dataset.d;
-  if(v){const r=DB.find(x=>x.InvoiceNo===v);$('inv2').innerHTML=inv(r);$('pv2').classList.remove('hide');$('pv2').scrollIntoView({behavior:'smooth'});$('dl2').onclick=()=>pdf('inv2',v)}
+  if(v){const r=DB.find(x=>x.InvoiceNo===v);$('inv2').innerHTML=inv(r);$('inv2').dataset.no=r.InvoiceNo;$('pv2').classList.remove('hide');$('pv2').scrollIntoView({behavior:'smooth'})}
   if(ed)edit(ed);
   if(d&&confirm('Delete invoice '+d+' permanently?')){const r=await api('delete',{id:d});toast(r.ok?'Deleted '+d:'Delete failed');load()}
 };
-$('dl').onclick=()=>pdf('inv',$('in').value);
 
 /* ===================== INVOICE (A4) ===================== */
 const O=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'],T=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
@@ -336,7 +348,7 @@ function inv(r){
   return '<div class="bar"></div>'+
   '<div class="ih"><img src="'+LOGO+'"><div class="co"><b>'+esc(CO.name)+'</b><span class="tg">Designed to Inspire</span>'+
   ((CO.gstin||CO.pan)?'<div class="id">'+(CO.gstin?'<span><i>GSTIN</i>'+esc(CO.gstin)+'</span>':'')+(CO.pan?'<span><i>PAN</i>'+esc(CO.pan)+'</span>':'')+'</div>':'')+'</div></div>'+
-  //'<div class="ad"><div class="a1"><small>Address</small>'+esc(CO.addr)+'</div><div class="a2"><small>Contact</small>Ph: '+esc(CO.ph)+'<br>'+esc(CO.em)+'<br>'+esc(CO.web)+'</div></div>'+
+  '<div class="ad"><div class="a1"><small>Address</small>'+esc(CO.addr)+'</div><div class="a2"><small>Contact</small>Ph: '+esc(CO.ph)+'<br>'+esc(CO.em)+'<br>'+esc(CO.web)+'</div></div>'+
   '<div class="tl"><h3>TAX INVOICE</h3><div>Invoice No: <b>'+esc(r.InvoiceNo)+'</b><br>Date: <b>'+esc(fd(r.Date))+'</b></div></div>'+
   '<div class="bd"><div class="pj"><div><small>Project</small><b>'+esc(r.Project)+'</b></div><div><small>Service Type</small><b>'+esc(r.Type)+'</b></div></div>'+
   '<div class="pt'+(hasShip?'':' one')+'"><div><small>Buyer (Bill to)</small>'+party(r.Client,r.ClientGSTIN,r.ClientPAN,r.ClientAddress)+'</div>'+(hasShip?'<div><small>Consignee (Ship to)</small>'+party(r.ShipName,r.ShipGSTIN,r.ShipPAN,r.ShipAddress)+'</div>':'')+'</div>'+
@@ -351,19 +363,55 @@ function inv(r){
 }
 
 /* ===================== PDF (A4) ===================== */
-async function pdf(id,no){
-  const name='Subha-Infra-Invoice-'+String(no).replace(/[^\w-]+/g,'_')+'.pdf';toast('Preparing PDF…');
+const fname=no=>'Subha-Infra-Invoice-'+String(no||'invoice').replace(/[^\w-]+/g,'_')+'.pdf';
+/* Renders a private copy of the invoice (off-screen, full size, outside any scroll box) so nothing can be cropped */
+async function makePdf(id){
+  if(!window.html2canvas||!window.jspdf)throw new Error('PDF libraries did not load (check internet)');
+  const host=document.createElement('div');
+  host.className='inv';host.style.cssText='position:absolute;left:-10000px;top:0;margin:0;';
+  host.innerHTML=$(id).innerHTML;document.body.appendChild(host);
   try{
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;
-    const blob=await html2pdf().set({margin:0,filename:name,image:{type:'jpeg',quality:.98},
-      html2canvas:{scale:2,useCORS:true,scrollX:0,scrollY:0,windowWidth:794,backgroundColor:'#ffffff'},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait',compress:true},
-      pagebreak:{mode:['css','legacy'],avoid:['tr','.sm','.tc','.sg']}}).from($(id)).outputPdf('blob');
-    let ok=false;
-    if(window.showDirectoryPicker){try{const d=await showDirectoryPicker({mode:'readwrite'}),f=await d.getDirectoryHandle('Subha Infra Invoices',{create:true}),h=await f.getFileHandle(name,{create:true}),w=await h.createWritable();await w.write(blob);await w.close();ok=true;toast('Saved in folder “Subha Infra Invoices”')}catch(e){}}
-    if(!ok){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click()}
-  }catch(e){toast('PDF failed – try again')}
+    await Promise.all([...host.querySelectorAll('img')].map(i=>i.decode?i.decode().catch(()=>{}):0));
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const h=Math.ceil(host.scrollHeight);
+    const cv=await html2canvas(host,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:0,windowWidth:794,windowHeight:h});
+    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait',compress:true});
+    const pageH=Math.floor(cv.width*297/210),pages=Math.max(1,Math.ceil((cv.height-8)/pageH));
+    for(let p=0;p<pages;p++){
+      const sh=Math.min(pageH,cv.height-p*pageH),pc=document.createElement('canvas');
+      pc.width=cv.width;pc.height=pageH;
+      const cx=pc.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,pc.width,pc.height);
+      cx.drawImage(cv,0,p*pageH,cv.width,sh,0,0,cv.width,sh);
+      if(p)pdf.addPage();
+      pdf.addImage(pc.toDataURL('image/jpeg',0.95),'JPEG',0,0,210,297,undefined,'FAST');
+    }
+    return pdf.output('blob');
+  }finally{host.remove()}
 }
+async function savePdf(id,mode){
+  const name=fname($(id).dataset.no);let dir=null;
+  if(mode==='folder'){
+    if(!window.showDirectoryPicker)toast('Folder saving works in Chrome / Edge on a computer – downloading normally instead');
+    else{try{dir=await showDirectoryPicker({mode:'readwrite'})}catch(e){return}}   // ask first, while the click is fresh
+  }
+  toast('Preparing PDF…');
+  try{
+    const blob=await makePdf(id);
+    if(dir){const f=await dir.getDirectoryHandle('Subha Infra Invoices',{create:true}),h=await f.getFileHandle(name,{create:true}),w=await h.createWritable();await w.write(blob);await w.close();toast('Saved in folder “Subha Infra Invoices”')}
+    else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000);toast('PDF downloaded')}
+  }catch(e){console.error(e);toast('PDF failed – please use “Print / Save as PDF”')}
+}
+function printInv(id){
+  const t=document.title;$('printhost').innerHTML='<div class="inv">'+$(id).innerHTML+'</div>';
+  document.title=fname($(id).dataset.no).replace('.pdf','');
+  window.onafterprint=()=>{$('printhost').innerHTML='';document.title=t;window.onafterprint=null};
+  window.print();
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const id=b.parentNode.dataset.src;
+  if(b.dataset.act==='pdf')savePdf(id);else if(b.dataset.act==='folder')savePdf(id,'folder');else printInv(id);
+});
 if(store.get())enter();
 </script>
 </body>
